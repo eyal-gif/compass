@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-bg-primary: #faf6f1;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-2: #f0ebe4;
+  --color-accent: #c6725f;
+  --color-accent-light: #e8a090;
+  --color-accent-dark: #9e5545;
+  --color-sage: #6b7f5e;
+  --color-sage-muted: #8a9e7d;
+  --color-sage-light: #e8ede5;
+  --color-charcoal: #2c2c2c;
+  --color-warm-gray: #7a7168;
+  --color-light-gray: #d9d3cc;
+  --color-text-primary: #2c2c2c;
+  --color-text-secondary: #7a7168;
+  --color-text-dim: #a69e95;
+  --color-border: #e5dfd8;
+  --color-gold: #c9a227;
+  --color-gold-light: #f5efd6;
+
+  /* Typography */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', 'Helvetica Neue', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(44,44,44,0.04);
+  --shadow-md: 0 4px 16px rgba(44,44,44,0.06);
+  --shadow-lg: 0 12px 40px rgba(44,44,44,0.12);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Writing cursor blink */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Smooth page transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
