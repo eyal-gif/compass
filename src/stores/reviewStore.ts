@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { WeeklyReview } from '@/types';
+import { safeLocalStorage } from '@/lib/safe-storage';
 
 interface ReviewState {
   reviews: WeeklyReview[];
@@ -32,6 +33,7 @@ export const useReviewStore = create<ReviewState>()(
     }),
     {
       name: 'compass-reviews',
+      storage: safeLocalStorage,
     }
   )
 );

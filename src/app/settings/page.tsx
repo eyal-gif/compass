@@ -185,6 +185,7 @@ export default function SettingsPage() {
                       value={nameValue}
                       onChange={(e) => setNameValue(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
+                      maxLength={50}
                       className="w-32 rounded-lg border border-border bg-bg-primary px-2 py-1 text-sm font-body text-charcoal focus:outline-none focus:ring-1 focus:ring-accent"
                       autoFocus
                     />

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { UserProfile } from '@/types';
+import { safeLocalStorage } from '@/lib/safe-storage';
 
 interface UserState {
   profile: UserProfile;
@@ -108,6 +109,7 @@ export const useUserStore = create<UserState>()(
     }),
     {
       name: 'compass-user',
+      storage: safeLocalStorage,
     }
   )
 );

@@ -116,6 +116,7 @@ export default function OnboardingPage() {
                 placeholder="Your first name"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
+                maxLength={50}
                 className="mt-6 w-full rounded-xl border border-border bg-bg-surface px-4 py-3.5 font-body text-base text-charcoal placeholder:text-text-dim focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-colors"
               />
 

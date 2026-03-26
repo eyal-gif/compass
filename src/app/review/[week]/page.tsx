@@ -63,7 +63,8 @@ const fadeUp = {
 export default function WeeklyReviewPage() {
   const params = useParams();
   const router = useRouter();
-  const weekNum = Number(params.week);
+  const rawWeek = Number(params.week);
+  const weekNum = Number.isInteger(rawWeek) && rawWeek >= 1 && rawWeek <= 4 ? rawWeek : 0;
   const profile = useUserStore((s) => s.profile);
   const entries = useJournalStore((s) => s.entries);
   const completions = useJournalStore((s) => s.completions);
@@ -86,6 +87,17 @@ export default function WeeklyReviewPage() {
       videosWatched,
     };
   }, [entries, completions, weekDays]);
+
+  if (weekNum === 0) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary px-6">
+        <p className="font-body text-warm-gray">Invalid week.</p>
+        <button onClick={() => router.push('/')} className="mt-4 font-body text-sm text-accent underline">
+          Back to dashboard
+        </button>
+      </div>
+    );
+  }
 
   const patterns = weekPatterns[weekNum] ?? weekPatterns[1];
   const whyDraft = existingReview?.whyDraft ?? weekWhyDrafts[weekNum] ?? weekWhyDrafts[1];

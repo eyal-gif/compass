@@ -34,7 +34,8 @@ export default function DayPage() {
   const completeDay = useJournalStore((s) => s.completeDay);
   const advanceDay = useUserStore((s) => s.advanceDay);
 
-  const dayNumber = Number(params.dayNumber);
+  const rawDay = Number(params.dayNumber);
+  const dayNumber = Number.isInteger(rawDay) && rawDay >= 1 && rawDay <= 28 ? rawDay : 0;
   const content = useMemo(() => getDayContent(dayNumber), [dayNumber]);
 
   // Hydration guard
@@ -250,9 +251,10 @@ export default function DayPage() {
                   <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
                     <iframe
                       className="absolute inset-0 h-full w-full"
-                      src={`https://www.youtube.com/embed/${content.video.youtubeId}`}
+                      src={`https://www.youtube.com/embed/${content.video.youtubeId.replace(/[^a-zA-Z0-9_-]/g, '')}`}
                       title={content.video.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                      sandbox="allow-scripts allow-same-origin allow-presentation"
                       allowFullScreen
                     />
                   </div>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { JournalEntry, DayCompletion, Discovery } from '@/types';
+import { safeLocalStorage } from '@/lib/safe-storage';
 
 interface JournalState {
   entries: JournalEntry[];
@@ -31,11 +32,13 @@ export const useJournalStore = create<JournalState>()(
 
       updateEntry: (id, updates) =>
         set((state) => ({
-          entries: state.entries.map((entry) =>
-            entry.id === id
-              ? { ...entry, ...updates, updatedAt: new Date().toISOString() }
-              : entry
-          ),
+          entries: state.entries.map((entry) => {
+            if (entry.id !== id) return entry;
+            // Only allow updating safe fields
+            const { id: _id, dayNumber: _d, createdAt: _c, ...safeUpdates } = updates;
+            void _id; void _d; void _c;
+            return { ...entry, ...safeUpdates, updatedAt: new Date().toISOString() };
+          }),
         })),
 
       completeDay: (completion) =>
@@ -91,6 +94,7 @@ export const useJournalStore = create<JournalState>()(
     }),
     {
       name: 'compass-journal',
+      storage: safeLocalStorage,
     }
   )
 );

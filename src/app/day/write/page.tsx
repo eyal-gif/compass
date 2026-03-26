@@ -32,8 +32,10 @@ function WritePageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const dayNumber = Number(searchParams.get('dayNumber') ?? 0);
-  const initialPromptIndex = Number(searchParams.get('promptIndex') ?? 0);
+  const rawDay = Number(searchParams.get('dayNumber') ?? 0);
+  const dayNumber = Number.isInteger(rawDay) && rawDay >= 1 && rawDay <= 28 ? rawDay : 0;
+  const rawPrompt = Number(searchParams.get('promptIndex') ?? 0);
+  const initialPromptIndex = Number.isInteger(rawPrompt) && rawPrompt >= 0 ? rawPrompt : 0;
 
   const profile = useUserStore((s) => s.profile);
   const addEntry = useJournalStore((s) => s.addEntry);
