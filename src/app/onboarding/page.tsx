@@ -1,13 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUserStore } from '@/stores/userStore';
-import { getPhaseIntro } from '@/data/marcus-quotes';
+import { useMeditationStore } from '@/stores/meditationStore';
 import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
-import MarcusCard from '@/components/marcus/MarcusCard';
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -28,14 +25,33 @@ const slideVariants = {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const setName = useUserStore((s) => s.setName);
-  const setDailyReminderTime = useUserStore((s) => s.setDailyReminderTime);
-  const completeOnboarding = useUserStore((s) => s.completeOnboarding);
+
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    useMeditationStore.persist.rehydrate();
+    setHydrated(true);
+  }, []);
+
+  const user = useMeditationStore((s) => s.user);
+  const setName = useMeditationStore((s) => s.setName);
+  const completeOnboarding = useMeditationStore((s) => s.completeOnboarding);
 
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [nameInput, setNameInput] = useState('');
-  const [reminderTime, setReminderTime] = useState('09:00');
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-primary">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-accent/30" />
+      </div>
+    );
+  }
+
+  if (user.onboardingComplete) {
+    router.replace('/');
+    return null;
+  }
 
   function goNext() {
     setDirection(1);
@@ -44,19 +60,18 @@ export default function OnboardingPage() {
 
   function handleComplete() {
     setName(nameInput.trim());
-    setDailyReminderTime(reminderTime);
     completeOnboarding();
     router.replace('/');
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary px-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-primary px-6">
       <div className="w-full max-w-md">
         <AnimatePresence mode="wait" custom={direction}>
-          {/* ── Step 0: Splash ─────────────────────────────── */}
+          {/* Step 0: Welcome */}
           {step === 0 && (
             <motion.div
-              key="splash"
+              key="welcome"
               custom={direction}
               variants={slideVariants}
               initial="enter"
@@ -64,35 +79,32 @@ export default function OnboardingPage() {
               exit="exit"
               className="flex flex-col items-center text-center"
             >
-              <span className="text-6xl" role="img" aria-label="Compass">
-                {'\uD83E\uDDED'}
+              <span className="text-6xl" role="img" aria-label="Lotus">
+                {'\uD83E\uDDD8'}
               </span>
 
               <h1 className="mt-6 font-display text-3xl font-bold text-charcoal">
-                Compass
+                Stillness
               </h1>
-              <p className="mt-1 font-body text-base text-warm-gray">
-                Find your direction
+              <p className="mt-2 font-body text-base text-warm-gray">
+                Build your meditation practice in 30 days
               </p>
 
-              <MarcusCard
-                quote={getPhaseIntro('excavation')}
-                className="mt-8"
-              />
+              <p className="mt-6 font-body text-sm text-warm-gray leading-relaxed max-w-xs">
+                Each day brings a new guided session — starting short and building
+                gradually. No experience needed. Just you, a quiet moment, and the
+                willingness to sit still.
+              </p>
 
               <div className="mt-8 w-full">
                 <Button fullWidth size="lg" onClick={goNext}>
-                  Begin your journey
+                  Get Started
                 </Button>
               </div>
-
-              <p className="mt-4 font-body text-xs text-text-dim">
-                A 28-day self-discovery program
-              </p>
             </motion.div>
           )}
 
-          {/* ── Step 1: Name & Reminder ────────────────────── */}
+          {/* Step 1: Name */}
           {step === 1 && (
             <motion.div
               key="name"
@@ -104,95 +116,25 @@ export default function OnboardingPage() {
               className="flex flex-col"
             >
               <h2 className="font-display text-2xl font-bold text-charcoal">
-                What should I call you?
+                What should we call you?
               </h2>
               <p className="mt-2 font-body text-sm text-warm-gray">
-                Marcus will use this name when he speaks with you.
+                Optional — you can leave this blank.
               </p>
 
               <input
                 autoFocus
                 type="text"
-                placeholder="Your first name"
+                placeholder="Your name"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 maxLength={50}
-                className="mt-6 w-full rounded-xl border border-border bg-bg-surface px-4 py-3.5 font-body text-base text-charcoal placeholder:text-text-dim focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-colors"
-              />
-
-              <div className="mt-6">
-                <label className="block font-body text-sm font-medium text-charcoal">
-                  Daily reminder time
-                </label>
-                <p className="mt-1 font-body text-xs text-warm-gray">
-                  We&apos;ll nudge you to show up each day.
-                </p>
-                <input
-                  type="time"
-                  value={reminderTime}
-                  onChange={(e) => setReminderTime(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 font-mono text-sm text-charcoal focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-colors"
-                />
-              </div>
-
-              <div className="mt-8">
-                <Button
-                  fullWidth
-                  size="lg"
-                  disabled={!nameInput.trim()}
-                  onClick={goNext}
-                >
-                  Continue
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ── Step 2: Commitment ─────────────────────────── */}
-          {step === 2 && (
-            <motion.div
-              key="commit"
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              className="flex flex-col items-center text-center"
-            >
-              <h2 className="font-display text-2xl font-bold text-charcoal">
-                Your commitment
-              </h2>
-
-              <Card className="mt-6 text-left" variant="sage">
-                <ul className="space-y-3 font-body text-sm text-charcoal">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 text-sage">&#x2713;</span>
-                    <span>28 days of guided self-discovery</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 text-sage">&#x2713;</span>
-                    <span>15-30 minutes of honest reflection daily</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 text-sage">&#x2713;</span>
-                    <span>Write for yourself, not for anyone else</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 text-sage">&#x2713;</span>
-                    <span>Show up even when it gets uncomfortable</span>
-                  </li>
-                </ul>
-              </Card>
-
-              <MarcusCard
-                quote={`${nameInput.trim()}, this only works if you're honest. Not polished — honest. Can you do that.`}
-                variant="gold"
-                className="mt-6"
+                className="mt-6 w-full rounded-xl border border-light-gray bg-surface px-4 py-3.5 font-body text-base text-charcoal placeholder:text-warm-gray/50 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-colors"
               />
 
               <div className="mt-8 w-full">
                 <Button fullWidth size="lg" onClick={handleComplete}>
-                  I&apos;m ready
+                  Begin Journey
                 </Button>
               </div>
 
@@ -201,7 +143,7 @@ export default function OnboardingPage() {
                   setDirection(-1);
                   setStep((s) => s - 1);
                 }}
-                className="mt-3 font-body text-sm text-warm-gray hover:text-charcoal transition-colors"
+                className="mt-3 self-center font-body text-sm text-warm-gray hover:text-charcoal transition-colors"
               >
                 Go back
               </button>
@@ -211,7 +153,7 @@ export default function OnboardingPage() {
 
         {/* Step dots */}
         <div className="mt-10 flex items-center justify-center gap-2">
-          {[0, 1, 2].map((i) => (
+          {[0, 1].map((i) => (
             <div
               key={i}
               className={[
@@ -220,7 +162,7 @@ export default function OnboardingPage() {
                   ? 'w-6 bg-accent'
                   : i < step
                   ? 'w-1.5 bg-sage'
-                  : 'w-1.5 bg-border',
+                  : 'w-1.5 bg-light-gray',
               ].join(' ')}
             />
           ))}

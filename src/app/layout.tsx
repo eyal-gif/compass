@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Compass — Find Your Direction",
-  description: "A 28-day self-discovery program to find your career direction and personal purpose.",
+  title: "Stillness — Daily Meditation",
+  description: "A 30-day guided meditation program to build your daily practice, one breath at a time.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Compass",
+    title: "Stillness",
   },
 };
 
@@ -16,7 +16,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#faf6f1",
+  themeColor: "#6b7f5e",
 };
 
 export default function RootLayout({

@@ -1,22 +1,15 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useUserStore } from '@/stores/userStore';
-import { useJournalStore } from '@/stores/journalStore';
-import { getDayContent, dayTypeToBadgeVariant } from '@/data/program';
-import { getRandomQuote } from '@/data/marcus-quotes';
-import {
-  getPhaseLabel,
-  getPhaseForWeek,
-  getDayTypeLabel,
-} from '@/lib/utils';
+import { useMeditationStore } from '@/stores/meditationStore';
+import { getDayContent } from '@/data/program';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
-import MarcusCard from '@/components/marcus/MarcusCard';
+import Timer from '@/components/meditation/Timer';
+import YouTubePlayer from '@/components/meditation/YouTubePlayer';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 14 },
@@ -27,24 +20,70 @@ const fadeUp = {
   }),
 };
 
+const typeBadgeColors: Record<string, string> = {
+  guided: 'bg-accent/15 text-accent',
+  breathing: 'bg-sage/15 text-sage',
+  'body-scan': 'bg-warm-gray/15 text-warm-gray',
+  silent: 'bg-charcoal/10 text-charcoal',
+  'loving-kindness': 'bg-accent/10 text-accent',
+};
+
+const ratingEmojis = [
+  { value: 1, emoji: '\uD83D\uDE23', label: 'Struggled' },
+  { value: 2, emoji: '\uD83D\uDE15', label: 'Uneasy' },
+  { value: 3, emoji: '\uD83D\uDE10', label: 'Neutral' },
+  { value: 4, emoji: '\uD83D\uDE42', label: 'Good' },
+  { value: 5, emoji: '\uD83D\uDE0C', label: 'Peaceful' },
+];
+
 export default function DayClient() {
   const params = useParams();
   const router = useRouter();
-  const profile = useUserStore((s) => s.profile);
-  const completeDay = useJournalStore((s) => s.completeDay);
-  const advanceDay = useUserStore((s) => s.advanceDay);
+
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    useMeditationStore.persist.rehydrate();
+    setHydrated(true);
+  }, []);
+
+  const user = useMeditationStore((s) => s.user);
+  const completions = useMeditationStore((s) => s.completions);
+  const completeDay = useMeditationStore((s) => s.completeDay);
 
   const rawDay = Number(params.dayNumber);
-  const dayNumber = Number.isInteger(rawDay) && rawDay >= 1 && rawDay <= 28 ? rawDay : 0;
+  const dayNumber = Number.isInteger(rawDay) && rawDay >= 1 && rawDay <= 30 ? rawDay : 0;
   const content = useMemo(() => getDayContent(dayNumber), [dayNumber]);
 
-  // Hydration guard
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [timerDone, setTimerDone] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [note, setNote] = useState('');
 
-  if (!mounted) {
+  const isAlreadyCompleted = !!completions[dayNumber];
+
+  const handleTimerComplete = useCallback(() => {
+    setTimerDone(true);
+    setShowCompletion(true);
+  }, []);
+
+  function handleSkip() {
+    setShowCompletion(true);
+  }
+
+  function handleComplete() {
+    if (!content) return;
+    completeDay(
+      dayNumber,
+      content.durationMinutes * 60,
+      rating || 3,
+      note.trim(),
+    );
+    router.push('/');
+  }
+
+  if (!hydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg-primary">
+      <div className="flex min-h-screen items-center justify-center bg-primary">
         <div className="h-8 w-8 animate-pulse rounded-full bg-accent/30" />
       </div>
     );
@@ -52,43 +91,24 @@ export default function DayClient() {
 
   if (!content) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary px-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-primary px-6">
         <p className="font-body text-warm-gray">Day not found.</p>
         <Link href="/" className="mt-4 font-body text-sm text-accent underline">
-          Back to dashboard
+          Back to home
         </Link>
       </div>
     );
   }
 
-  const phase = getPhaseForWeek(content.week);
-
-  function handleActionComplete() {
-    completeDay({
-      dayNumber: content!.dayNumber,
-      completedAt: new Date().toISOString(),
-      journalEntries: [],
-      videoWatched: false,
-      actionCompleted: true,
-      skipped: false,
-    });
-    if (dayNumber === profile.currentDay) {
-      advanceDay();
-    }
-    router.push('/');
-  }
-
-  // ── Render by type ───────────────────────────────────────────
-
   return (
-    <div className="min-h-screen bg-bg-primary pb-16">
-      <div className="mx-auto max-w-lg px-5 pt-6">
+    <div className="min-h-screen bg-primary pb-16">
+      <div className="mx-auto max-w-lg px-6 pt-6">
         {/* Back link */}
         <Link
           href="/"
           className="inline-flex items-center gap-1 font-body text-sm text-warm-gray hover:text-charcoal transition-colors"
         >
-          <span aria-hidden>&larr;</span> Dashboard
+          <span aria-hidden>&larr;</span> Home
         </Link>
 
         {/* Header */}
@@ -100,280 +120,146 @@ export default function DayClient() {
           className="mt-5"
         >
           <div className="flex items-center gap-2">
-            <Badge variant={dayTypeToBadgeVariant(content.type)} />
-            <span className="font-mono text-xs text-text-dim uppercase">
+            <span
+              className={[
+                'rounded-full px-2.5 py-0.5 text-xs font-medium font-body capitalize',
+                typeBadgeColors[content.type] ?? 'bg-light-gray text-charcoal',
+              ].join(' ')}
+            >
+              {content.type.replace('-', ' ')}
+            </span>
+            <span className="font-mono text-xs text-warm-gray uppercase">
               Day {content.dayNumber}
             </span>
+            {isAlreadyCompleted && (
+              <span className="rounded-full bg-sage/15 px-2.5 py-0.5 text-xs font-medium text-sage font-body">
+                Completed
+              </span>
+            )}
           </div>
 
-          <p className="mt-3 font-mono text-xs tracking-widest text-warm-gray uppercase">
-            Week {content.week} &mdash; {getPhaseLabel(phase)}
-          </p>
-
-          <h1 className="mt-1 font-display text-2xl font-bold text-charcoal">
+          <h1 className="mt-3 font-display text-2xl font-bold text-charcoal">
             {content.title}
           </h1>
-          {content.subtitle && (
-            <p className="mt-1 font-body text-sm text-warm-gray">
-              {content.subtitle}
-            </p>
-          )}
+          <p className="mt-2 font-body text-sm text-warm-gray leading-relaxed">
+            {content.description}
+          </p>
         </motion.div>
 
-        {/* Marcus intro */}
+        {/* Tip */}
+        {content.tip && (
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={1}
+            className="mt-5"
+          >
+            <div className="rounded-xl bg-sage/10 px-4 py-3 border border-sage/20">
+              <p className="font-body text-sm text-sage leading-relaxed">
+                <span className="font-semibold">Tip:</span> {content.tip}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* YouTube Player */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
           animate="visible"
-          custom={1}
+          custom={2}
           className="mt-6"
         >
-          <MarcusCard quote={content.marcusIntro} />
+          <YouTubePlayer
+            youtubeId={content.youtubeId}
+            title={content.title}
+          />
         </motion.div>
 
-        {/* ── REST DAY ──────────────────────────────────────── */}
-        {content.type === 'rest' && (
+        {/* Timer */}
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          custom={3}
+          className="mt-8"
+        >
+          <Timer
+            durationMinutes={content.durationMinutes}
+            onComplete={handleTimerComplete}
+          />
+        </motion.div>
+
+        {/* Skip button (if timer not done) */}
+        {!showCompletion && (
           <motion.div
             variants={fadeUp}
             initial="hidden"
             animate="visible"
-            custom={2}
-            className="mt-6"
+            custom={4}
+            className="mt-4 text-center"
           >
-            <Card variant="sage" className="text-center">
-              <span className="text-4xl" role="img" aria-label="leaf">
-                {'\uD83C\uDF3F'}
-              </span>
-              <p className="mt-4 font-display text-lg italic text-charcoal">
-                {getRandomQuote('rest_day')}
-              </p>
-              <p className="mt-3 font-body text-sm text-sage">
-                No writing today. Let your mind integrate.
-              </p>
-            </Card>
-
-            {content.video && (
-              <Card className="mt-4">
-                <p className="font-body text-sm font-medium text-charcoal">
-                  Optional: {content.video.title}
-                </p>
-                <p className="mt-1 font-body text-xs text-warm-gray">
-                  {content.video.speaker} &middot; {content.video.durationMinutes} min
-                </p>
-              </Card>
-            )}
-
-            <div className="mt-6">
-              <Button fullWidth onClick={handleActionComplete}>
-                Mark rest day complete
-              </Button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── JOURNAL / SYNTHESIS ───────────────────────────── */}
-        {(content.type === 'journal' || content.type === 'synthesis') &&
-          content.prompts && (
-            <motion.div
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={2}
-              className="mt-6 space-y-4"
+            <button
+              onClick={handleSkip}
+              className="font-body text-sm text-warm-gray hover:text-charcoal transition-colors underline"
             >
-              {content.type === 'synthesis' && (
-                <Card variant="sage">
-                  <p className="font-body text-sm text-sage">
-                    Take a few minutes to re-read your entries from this week before you begin.
-                  </p>
-                </Card>
-              )}
-
-              <div className="space-y-3">
-                {content.prompts.map((prompt, idx) => (
-                  <Card key={prompt.id}>
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent/10 font-mono text-xs font-semibold text-accent">
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <p className="font-body text-sm leading-relaxed text-charcoal">
-                          {prompt.text}
-                        </p>
-                        {prompt.subPrompts && (
-                          <ul className="mt-2 space-y-1 pl-1">
-                            {prompt.subPrompts.map((sp, i) => (
-                              <li
-                                key={i}
-                                className="font-body text-xs text-warm-gray before:mr-1.5 before:content-['\u2022']"
-                              >
-                                {sp}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <p className="mt-2 font-mono text-xs text-text-dim">
-                          ~{prompt.estimatedMinutes} min
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-
-              {content.afterNote && (
-                <p className="font-body text-xs italic text-warm-gray">
-                  {content.afterNote}
-                </p>
-              )}
-
-              <Link href={`/day/write?dayNumber=${content.dayNumber}&promptIndex=0`}>
-                <Button fullWidth size="lg" className="mt-2">
-                  Start writing
-                </Button>
-              </Link>
-            </motion.div>
-          )}
-
-        {/* ── VIDEO JOURNAL ─────────────────────────────────── */}
-        {content.type === 'video_journal' && (
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            custom={2}
-            className="mt-6 space-y-4"
-          >
-            {content.video && (
-              <>
-                {/* Video embed */}
-                <div className="overflow-hidden rounded-2xl border border-border">
-                  <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                    <iframe
-                      className="absolute inset-0 h-full w-full"
-                      src={`https://www.youtube.com/embed/${content.video.youtubeId.replace(/[^a-zA-Z0-9_-]/g, '')}`}
-                      title={content.video.title}
-                      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                      sandbox="allow-scripts allow-same-origin allow-presentation"
-                      allowFullScreen
-                    />
-                  </div>
-                  <div className="bg-bg-surface p-4">
-                    <p className="font-body text-sm font-medium text-charcoal">
-                      {content.video.title}
-                    </p>
-                    <p className="mt-0.5 font-body text-xs text-warm-gray">
-                      {content.video.speaker} &middot;{' '}
-                      {content.video.durationMinutes} min
-                    </p>
-                  </div>
-                </div>
-
-                {/* Pre-watch note */}
-                <MarcusCard
-                  quote={content.video.preWatchNote}
-                  variant="gold"
-                />
-
-                {/* Reflection prompts */}
-                {content.video.postWatchPrompts && (
-                  <div className="space-y-3">
-                    <h3 className="font-body text-xs font-semibold tracking-widest text-warm-gray uppercase">
-                      After watching
-                    </h3>
-                    {content.video.postWatchPrompts.map((prompt, idx) => (
-                      <Card key={idx}>
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent/10 font-mono text-xs font-semibold text-accent">
-                            {idx + 1}
-                          </span>
-                          <p className="font-body text-sm text-charcoal">
-                            {prompt}
-                          </p>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Journal prompts */}
-            {content.prompts && content.prompts.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-body text-xs font-semibold tracking-widest text-warm-gray uppercase">
-                  Journal prompts
-                </h3>
-                {content.prompts.map((prompt, idx) => (
-                  <Card key={prompt.id}>
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent/10 font-mono text-xs font-semibold text-accent">
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <p className="font-body text-sm leading-relaxed text-charcoal">
-                          {prompt.text}
-                        </p>
-                        <p className="mt-2 font-mono text-xs text-text-dim">
-                          ~{prompt.estimatedMinutes} min
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            {content.afterNote && (
-              <p className="font-body text-xs italic text-warm-gray">
-                {content.afterNote}
-              </p>
-            )}
-
-            <Link href={`/day/write?dayNumber=${content.dayNumber}&promptIndex=0`}>
-              <Button fullWidth size="lg" className="mt-2">
-                Start reflection
-              </Button>
-            </Link>
+              Skip to completion
+            </button>
           </motion.div>
         )}
 
-        {/* ── ACTION ────────────────────────────────────────── */}
-        {content.type === 'action' && content.actionSteps && (
+        {/* Completion form */}
+        {showCompletion && (
           <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            custom={2}
-            className="mt-6 space-y-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="mt-8"
           >
-            {content.marcusNudge && (
-              <MarcusCard quote={content.marcusNudge} variant="gold" />
-            )}
+            <Card>
+              <h3 className="font-display text-lg font-bold text-charcoal text-center">
+                How did that feel?
+              </h3>
 
-            <div className="space-y-3">
-              {content.actionSteps.map((step) => (
-                <Card key={step.stepNumber}>
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gold-light font-mono text-sm font-bold text-gold">
-                      {step.stepNumber}
+              {/* Rating buttons */}
+              <div className="mt-4 flex justify-center gap-3">
+                {ratingEmojis.map((r) => (
+                  <button
+                    key={r.value}
+                    onClick={() => setRating(r.value)}
+                    className={[
+                      'flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition-all duration-150',
+                      rating === r.value
+                        ? 'bg-accent/10 ring-2 ring-accent scale-110'
+                        : 'hover:bg-light-gray/30',
+                    ].join(' ')}
+                    aria-label={r.label}
+                  >
+                    <span className="text-2xl">{r.emoji}</span>
+                    <span className="text-[10px] font-body text-warm-gray">
+                      {r.label}
                     </span>
-                    <div>
-                      <p className="font-body text-sm font-semibold text-charcoal">
-                        {step.title}
-                      </p>
-                      <p className="mt-1 font-body text-sm text-warm-gray leading-relaxed">
-                        {step.description}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
 
-            <Button fullWidth size="lg" onClick={handleActionComplete}>
-              I&apos;ve completed this
-            </Button>
+              {/* Optional note */}
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Any thoughts or reflections... (optional)"
+                rows={3}
+                className="mt-4 w-full resize-none rounded-xl border border-light-gray bg-primary px-4 py-3 font-body text-sm text-charcoal placeholder:text-warm-gray/50 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-colors"
+              />
+
+              {/* Complete button */}
+              <div className="mt-4">
+                <Button fullWidth size="lg" onClick={handleComplete}>
+                  Complete
+                </Button>
+              </div>
+            </Card>
           </motion.div>
         )}
       </div>

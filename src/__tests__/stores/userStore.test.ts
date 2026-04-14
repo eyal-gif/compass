@@ -1,283 +1,342 @@
-import { useUserStore } from '@/stores/userStore';
+import {
+  useMeditationStore,
+  getCurrentStreak,
+  getLongestStreak,
+  getTotalMinutes,
+  getTotalSessions,
+  getAverageRating,
+  Completions,
+} from '@/stores/meditationStore';
 import { act } from '@testing-library/react';
 
 // Reset store before each test
 beforeEach(() => {
-  const { resetAll } = useUserStore.getState();
   act(() => {
-    resetAll();
+    useMeditationStore.getState().resetAll();
   });
 });
 
-describe('useUserStore', () => {
+describe('useMeditationStore', () => {
   describe('initial state', () => {
-    it('should have default profile values', () => {
-      const { profile } = useUserStore.getState();
-      expect(profile.name).toBe('');
-      expect(profile.currentDay).toBe(1);
-      expect(profile.currentWeek).toBe(1);
-      expect(profile.dailyReminderTime).toBe('09:00');
-      expect(profile.marcusNudgesEnabled).toBe(true);
-      expect(profile.weeklyPatternAnalysis).toBe(true);
-      expect(profile.writingFontSize).toBe('medium');
-      expect(profile.darkModeWriting).toBe(false);
-      expect(profile.onboardingComplete).toBe(false);
+    it('should have empty name', () => {
+      const { user } = useMeditationStore.getState();
+      expect(user.name).toBe('');
     });
 
-    it('should have a valid UUID as id', () => {
-      const { profile } = useUserStore.getState();
-      expect(profile.id).toBeDefined();
-      expect(typeof profile.id).toBe('string');
-      expect(profile.id.length).toBeGreaterThan(0);
+    it('should start at day 1', () => {
+      const { user } = useMeditationStore.getState();
+      expect(user.currentDay).toBe(1);
     });
 
-    it('should have valid ISO date strings for startDate and createdAt', () => {
-      const { profile } = useUserStore.getState();
-      expect(() => new Date(profile.startDate)).not.toThrow();
-      expect(() => new Date(profile.createdAt)).not.toThrow();
-      expect(new Date(profile.startDate).getTime()).not.toBeNaN();
-      expect(new Date(profile.createdAt).getTime()).not.toBeNaN();
+    it('should have default reminder time of 09:00', () => {
+      const { user } = useMeditationStore.getState();
+      expect(user.dailyReminderTime).toBe('09:00');
+    });
+
+    it('should not have completed onboarding', () => {
+      const { user } = useMeditationStore.getState();
+      expect(user.onboardingComplete).toBe(false);
+    });
+
+    it('should have a valid startDate', () => {
+      const { user } = useMeditationStore.getState();
+      expect(new Date(user.startDate).getTime()).not.toBeNaN();
+    });
+
+    it('should start with empty completions', () => {
+      const { completions } = useMeditationStore.getState();
+      expect(Object.keys(completions)).toHaveLength(0);
     });
   });
 
   describe('setName', () => {
-    it('should update the profile name', () => {
+    it('should update the user name', () => {
       act(() => {
-        useUserStore.getState().setName('Marcus');
+        useMeditationStore.getState().setName('Luna');
       });
-      expect(useUserStore.getState().profile.name).toBe('Marcus');
+      expect(useMeditationStore.getState().user.name).toBe('Luna');
     });
 
     it('should handle empty string', () => {
       act(() => {
-        useUserStore.getState().setName('Marcus');
+        useMeditationStore.getState().setName('Luna');
       });
       act(() => {
-        useUserStore.getState().setName('');
+        useMeditationStore.getState().setName('');
       });
-      expect(useUserStore.getState().profile.name).toBe('');
+      expect(useMeditationStore.getState().user.name).toBe('');
     });
 
-    it('should not alter other profile fields', () => {
+    it('should not alter other user fields', () => {
       act(() => {
-        useUserStore.getState().setName('Test');
+        useMeditationStore.getState().setName('Luna');
       });
-      const { profile } = useUserStore.getState();
-      expect(profile.currentDay).toBe(1);
-      expect(profile.dailyReminderTime).toBe('09:00');
+      const { user } = useMeditationStore.getState();
+      expect(user.currentDay).toBe(1);
+      expect(user.dailyReminderTime).toBe('09:00');
     });
   });
 
   describe('completeOnboarding', () => {
     it('should set onboardingComplete to true', () => {
       act(() => {
-        useUserStore.getState().completeOnboarding();
+        useMeditationStore.getState().completeOnboarding();
       });
-      expect(useUserStore.getState().profile.onboardingComplete).toBe(true);
+      expect(useMeditationStore.getState().user.onboardingComplete).toBe(true);
     });
 
-    it('should update startDate when completing onboarding', () => {
-      const beforeStart = useUserStore.getState().profile.startDate;
-      // Small delay to ensure different timestamp
+    it('should refresh startDate', () => {
+      const before = useMeditationStore.getState().user.startDate;
       act(() => {
-        useUserStore.getState().completeOnboarding();
+        useMeditationStore.getState().completeOnboarding();
       });
-      const afterStart = useUserStore.getState().profile.startDate;
-      // startDate is refreshed on completeOnboarding
-      expect(afterStart).toBeDefined();
-      expect(new Date(afterStart).getTime()).not.toBeNaN();
+      const after = useMeditationStore.getState().user.startDate;
+      expect(after).toBeDefined();
+      expect(new Date(after).getTime()).not.toBeNaN();
     });
 
-    it('should be idempotent when called multiple times', () => {
+    it('should be idempotent', () => {
       act(() => {
-        useUserStore.getState().completeOnboarding();
+        useMeditationStore.getState().completeOnboarding();
       });
       act(() => {
-        useUserStore.getState().completeOnboarding();
+        useMeditationStore.getState().completeOnboarding();
       });
-      expect(useUserStore.getState().profile.onboardingComplete).toBe(true);
+      expect(useMeditationStore.getState().user.onboardingComplete).toBe(true);
     });
   });
 
-  describe('setDailyReminderTime', () => {
-    it('should update the reminder time', () => {
+  describe('completeDay', () => {
+    it('should record a completion for the given day', () => {
       act(() => {
-        useUserStore.getState().setDailyReminderTime('21:30');
+        useMeditationStore.getState().completeDay(1, 180, 4, 'Felt calm');
       });
-      expect(useUserStore.getState().profile.dailyReminderTime).toBe('21:30');
+      const { completions } = useMeditationStore.getState();
+      expect(completions[1]).toBeDefined();
+      expect(completions[1].durationSeconds).toBe(180);
+      expect(completions[1].feltRating).toBe(4);
+      expect(completions[1].note).toBe('Felt calm');
     });
-  });
 
-  describe('toggleMarcusNudges', () => {
-    it('should toggle from true to false', () => {
-      expect(useUserStore.getState().profile.marcusNudgesEnabled).toBe(true);
+    it('should default note to empty string', () => {
       act(() => {
-        useUserStore.getState().toggleMarcusNudges();
+        useMeditationStore.getState().completeDay(1, 180, 4);
       });
-      expect(useUserStore.getState().profile.marcusNudgesEnabled).toBe(false);
+      expect(useMeditationStore.getState().completions[1].note).toBe('');
     });
 
-    it('should toggle from false back to true', () => {
+    it('should advance currentDay to dayNumber + 1', () => {
       act(() => {
-        useUserStore.getState().toggleMarcusNudges();
+        useMeditationStore.getState().completeDay(1, 180, 4);
       });
+      expect(useMeditationStore.getState().user.currentDay).toBe(2);
+    });
+
+    it('should not go backwards if currentDay is already ahead', () => {
       act(() => {
-        useUserStore.getState().toggleMarcusNudges();
+        useMeditationStore.getState().completeDay(5, 300, 5);
       });
-      expect(useUserStore.getState().profile.marcusNudgesEnabled).toBe(true);
-    });
-  });
+      // currentDay should be 6
+      expect(useMeditationStore.getState().user.currentDay).toBe(6);
 
-  describe('toggleWeeklyPatternAnalysis', () => {
-    it('should toggle the weeklyPatternAnalysis flag', () => {
-      expect(useUserStore.getState().profile.weeklyPatternAnalysis).toBe(true);
       act(() => {
-        useUserStore.getState().toggleWeeklyPatternAnalysis();
+        useMeditationStore.getState().completeDay(2, 120, 3);
       });
-      expect(useUserStore.getState().profile.weeklyPatternAnalysis).toBe(false);
+      // currentDay should remain 6, not go back to 3
+      expect(useMeditationStore.getState().user.currentDay).toBe(6);
     });
-  });
 
-  describe('setWritingFontSize', () => {
-    it('should set font size to small', () => {
+    it('should store completedAt as valid ISO string', () => {
       act(() => {
-        useUserStore.getState().setWritingFontSize('small');
+        useMeditationStore.getState().completeDay(1, 180, 4);
       });
-      expect(useUserStore.getState().profile.writingFontSize).toBe('small');
+      const { completedAt } = useMeditationStore.getState().completions[1];
+      expect(new Date(completedAt).getTime()).not.toBeNaN();
     });
 
-    it('should set font size to large', () => {
+    it('should allow completing multiple days', () => {
       act(() => {
-        useUserStore.getState().setWritingFontSize('large');
+        useMeditationStore.getState().completeDay(1, 180, 4);
+        useMeditationStore.getState().completeDay(2, 240, 5);
+        useMeditationStore.getState().completeDay(3, 300, 3);
       });
-      expect(useUserStore.getState().profile.writingFontSize).toBe('large');
-    });
-
-    it('should set font size back to medium', () => {
-      act(() => {
-        useUserStore.getState().setWritingFontSize('large');
-      });
-      act(() => {
-        useUserStore.getState().setWritingFontSize('medium');
-      });
-      expect(useUserStore.getState().profile.writingFontSize).toBe('medium');
-    });
-  });
-
-  describe('toggleDarkModeWriting', () => {
-    it('should toggle dark mode from false to true', () => {
-      act(() => {
-        useUserStore.getState().toggleDarkModeWriting();
-      });
-      expect(useUserStore.getState().profile.darkModeWriting).toBe(true);
-    });
-
-    it('should toggle dark mode back to false', () => {
-      act(() => {
-        useUserStore.getState().toggleDarkModeWriting();
-      });
-      act(() => {
-        useUserStore.getState().toggleDarkModeWriting();
-      });
-      expect(useUserStore.getState().profile.darkModeWriting).toBe(false);
-    });
-  });
-
-  describe('advanceDay', () => {
-    it('should increment currentDay by 1', () => {
-      act(() => {
-        useUserStore.getState().advanceDay();
-      });
-      expect(useUserStore.getState().profile.currentDay).toBe(2);
-    });
-
-    it('should stay in week 1 for days 1-7', () => {
-      // Start at day 1, advance to day 7 (6 advances)
-      for (let i = 0; i < 6; i++) {
-        act(() => {
-          useUserStore.getState().advanceDay();
-        });
-      }
-      expect(useUserStore.getState().profile.currentDay).toBe(7);
-      expect(useUserStore.getState().profile.currentWeek).toBe(1);
-    });
-
-    it('should advance to week 2 on day 8', () => {
-      for (let i = 0; i < 7; i++) {
-        act(() => {
-          useUserStore.getState().advanceDay();
-        });
-      }
-      expect(useUserStore.getState().profile.currentDay).toBe(8);
-      expect(useUserStore.getState().profile.currentWeek).toBe(2);
-    });
-
-    it('should calculate week correctly for day 14', () => {
-      for (let i = 0; i < 13; i++) {
-        act(() => {
-          useUserStore.getState().advanceDay();
-        });
-      }
-      expect(useUserStore.getState().profile.currentDay).toBe(14);
-      expect(useUserStore.getState().profile.currentWeek).toBe(2);
-    });
-
-    it('should advance to week 3 on day 15', () => {
-      for (let i = 0; i < 14; i++) {
-        act(() => {
-          useUserStore.getState().advanceDay();
-        });
-      }
-      expect(useUserStore.getState().profile.currentDay).toBe(15);
-      expect(useUserStore.getState().profile.currentWeek).toBe(3);
-    });
-
-    it('should reach week 4 on day 22', () => {
-      for (let i = 0; i < 21; i++) {
-        act(() => {
-          useUserStore.getState().advanceDay();
-        });
-      }
-      expect(useUserStore.getState().profile.currentDay).toBe(22);
-      expect(useUserStore.getState().profile.currentWeek).toBe(4);
+      const { completions } = useMeditationStore.getState();
+      expect(Object.keys(completions)).toHaveLength(3);
     });
   });
 
   describe('resetAll', () => {
-    it('should reset profile to defaults', () => {
+    it('should reset user to defaults', () => {
       act(() => {
-        useUserStore.getState().setName('Marcus');
-        useUserStore.getState().completeOnboarding();
-        useUserStore.getState().advanceDay();
-        useUserStore.getState().toggleMarcusNudges();
+        useMeditationStore.getState().setName('Luna');
+        useMeditationStore.getState().completeOnboarding();
+        useMeditationStore.getState().completeDay(1, 180, 4);
       });
       act(() => {
-        useUserStore.getState().resetAll();
+        useMeditationStore.getState().resetAll();
       });
-      const { profile } = useUserStore.getState();
-      expect(profile.name).toBe('');
-      expect(profile.currentDay).toBe(1);
-      expect(profile.currentWeek).toBe(1);
-      expect(profile.onboardingComplete).toBe(false);
-      expect(profile.marcusNudgesEnabled).toBe(true);
+      const { user } = useMeditationStore.getState();
+      expect(user.name).toBe('');
+      expect(user.currentDay).toBe(1);
+      expect(user.onboardingComplete).toBe(false);
     });
 
-    it('should generate a new id on reset', () => {
-      const oldId = useUserStore.getState().profile.id;
+    it('should clear all completions', () => {
       act(() => {
-        useUserStore.getState().resetAll();
+        useMeditationStore.getState().completeDay(1, 180, 4);
+        useMeditationStore.getState().completeDay(2, 240, 5);
       });
-      const newId = useUserStore.getState().profile.id;
-      expect(newId).not.toBe(oldId);
+      act(() => {
+        useMeditationStore.getState().resetAll();
+      });
+      expect(Object.keys(useMeditationStore.getState().completions)).toHaveLength(0);
     });
 
-    it('should set fresh timestamps on reset', () => {
+    it('should set fresh startDate', () => {
       act(() => {
-        useUserStore.getState().resetAll();
+        useMeditationStore.getState().resetAll();
       });
-      const { profile } = useUserStore.getState();
-      expect(new Date(profile.startDate).getTime()).not.toBeNaN();
-      expect(new Date(profile.createdAt).getTime()).not.toBeNaN();
+      const { user } = useMeditationStore.getState();
+      expect(new Date(user.startDate).getTime()).not.toBeNaN();
     });
+  });
+});
+
+describe('getCurrentStreak', () => {
+  it('should return 0 for empty completions', () => {
+    expect(getCurrentStreak({})).toBe(0);
+  });
+
+  it('should return 1 for a single completion', () => {
+    const completions: Completions = {
+      5: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    expect(getCurrentStreak(completions)).toBe(1);
+  });
+
+  it('should count consecutive days from the highest day', () => {
+    const completions: Completions = {
+      3: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      4: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      5: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    expect(getCurrentStreak(completions)).toBe(3);
+  });
+
+  it('should stop counting at a gap', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      2: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      // gap at 3
+      4: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      5: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    // Highest is 5, then 4, then gap at 3 -> streak is 2
+    expect(getCurrentStreak(completions)).toBe(2);
+  });
+
+  it('should handle non-sequential keys', () => {
+    const completions: Completions = {
+      10: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    expect(getCurrentStreak(completions)).toBe(1);
+  });
+});
+
+describe('getLongestStreak', () => {
+  it('should return 0 for empty completions', () => {
+    expect(getLongestStreak({})).toBe(0);
+  });
+
+  it('should return 1 for a single completion', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    expect(getLongestStreak(completions)).toBe(1);
+  });
+
+  it('should find the longest consecutive run', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      2: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      // gap
+      5: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      6: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      7: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    expect(getLongestStreak(completions)).toBe(3);
+  });
+
+  it('should return full length when all days are consecutive', () => {
+    const completions: Completions = {};
+    for (let i = 1; i <= 10; i++) {
+      completions[i] = { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' };
+    }
+    expect(getLongestStreak(completions)).toBe(10);
+  });
+});
+
+describe('getTotalMinutes', () => {
+  it('should return 0 for empty completions', () => {
+    expect(getTotalMinutes({})).toBe(0);
+  });
+
+  it('should convert seconds to minutes', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 300, feltRating: 4, note: '' },
+      2: { completedAt: '', durationSeconds: 600, feltRating: 5, note: '' },
+    };
+    expect(getTotalMinutes(completions)).toBe(15); // (300 + 600) / 60
+  });
+
+  it('should handle fractional minutes', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 90, feltRating: 4, note: '' },
+    };
+    expect(getTotalMinutes(completions)).toBe(1.5);
+  });
+});
+
+describe('getTotalSessions', () => {
+  it('should return 0 for empty completions', () => {
+    expect(getTotalSessions({})).toBe(0);
+  });
+
+  it('should count the number of completed sessions', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      3: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+      7: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    expect(getTotalSessions(completions)).toBe(3);
+  });
+});
+
+describe('getAverageRating', () => {
+  it('should return 0 for empty completions', () => {
+    expect(getAverageRating({})).toBe(0);
+  });
+
+  it('should compute the average of feltRating values', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 180, feltRating: 3, note: '' },
+      2: { completedAt: '', durationSeconds: 180, feltRating: 5, note: '' },
+    };
+    expect(getAverageRating(completions)).toBe(4);
+  });
+
+  it('should handle a single entry', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 180, feltRating: 5, note: '' },
+    };
+    expect(getAverageRating(completions)).toBe(5);
+  });
+
+  it('should handle non-integer averages', () => {
+    const completions: Completions = {
+      1: { completedAt: '', durationSeconds: 180, feltRating: 3, note: '' },
+      2: { completedAt: '', durationSeconds: 180, feltRating: 4, note: '' },
+    };
+    expect(getAverageRating(completions)).toBe(3.5);
   });
 });

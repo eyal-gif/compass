@@ -4,22 +4,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useUserStore } from '@/stores/userStore';
-import { useJournalStore } from '@/stores/journalStore';
-import { getDayContent, getWeekDays, dayTypeToBadgeVariant } from '@/data/program';
-import { getGreeting } from '@/data/marcus-quotes';
 import {
-  getGreetingPrefix,
-  getDayTypeIcon,
-  getDayTypeLabel,
-  getPhaseForWeek,
-  getPhaseLabel,
-} from '@/lib/utils';
+  useMeditationStore,
+  getCurrentStreak,
+} from '@/stores/meditationStore';
+import { getDayContent } from '@/data/program';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
 import ProgressBar from '@/components/ui/ProgressBar';
-import MarcusCard from '@/components/marcus/MarcusCard';
 import BottomNav from '@/components/ui/BottomNav';
 
 const fadeUp = {
@@ -31,42 +23,50 @@ const fadeUp = {
   }),
 };
 
+const typeBadgeColors: Record<string, string> = {
+  guided: 'bg-accent/15 text-accent',
+  breathing: 'bg-sage/15 text-sage',
+  'body-scan': 'bg-warm-gray/15 text-warm-gray',
+  silent: 'bg-charcoal/10 text-charcoal',
+  'loving-kindness': 'bg-accent/10 text-accent',
+};
+
 export default function DashboardPage() {
   const router = useRouter();
-  const profile = useUserStore((s) => s.profile);
-  const getCompletionForDay = useJournalStore((s) => s.getCompletionForDay);
 
-  // Hydration guard for Zustand persisted stores
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    useMeditationStore.persist.rehydrate();
+    setHydrated(true);
+  }, []);
 
-  // Stable Marcus quote per session
-  const [marcusMessage] = useState(() => getGreeting());
+  const user = useMeditationStore((s) => s.user);
+  const completions = useMeditationStore((s) => s.completions);
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg-primary">
+      <div className="flex min-h-screen items-center justify-center bg-primary">
         <div className="h-8 w-8 animate-pulse rounded-full bg-accent/30" />
       </div>
     );
   }
 
-  // Redirect to onboarding if not complete
-  if (!profile.onboardingComplete) {
+  if (!user.onboardingComplete) {
     router.replace('/onboarding');
     return null;
   }
 
-  const { name, currentDay, currentWeek } = profile;
+  const { name, currentDay } = user;
+  const streak = getCurrentStreak(completions);
+  const completedCount = Object.keys(completions).length;
+  const progressPercent = Math.round((completedCount / 30) * 100);
   const todayContent = getDayContent(currentDay);
-  const weekDays = getWeekDays(currentWeek);
-  const phase = getPhaseForWeek(currentWeek);
-  const clampedWeek = Math.min(Math.max(currentWeek, 1), 4) as 1 | 2 | 3 | 4;
+  const isFinished = currentDay > 30;
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-24">
-      <div className="mx-auto max-w-lg px-5 pt-8">
-        {/* ── Greeting ─────────────────────────────────────── */}
+    <div className="min-h-screen bg-primary pb-24">
+      <div className="mx-auto max-w-lg px-6 pt-8">
+        {/* Greeting */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
@@ -74,14 +74,14 @@ export default function DashboardPage() {
           custom={0}
         >
           <p className="font-body text-sm tracking-wide text-warm-gray uppercase">
-            Day {currentDay} of 28
+            Day {Math.min(currentDay, 30)} of 30
           </p>
           <h1 className="mt-1 font-display text-2xl font-bold text-charcoal">
-            {getGreetingPrefix(name)}
+            Welcome back{name ? `, ${name}` : ''}
           </h1>
         </motion.div>
 
-        {/* ── Phase Progress ───────────────────────────────── */}
+        {/* Progress */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
@@ -89,25 +89,50 @@ export default function DashboardPage() {
           custom={1}
           className="mt-6"
         >
-          <p className="mb-2 text-center font-mono text-xs tracking-widest text-warm-gray uppercase">
-            Week {currentWeek} &mdash; {getPhaseLabel(phase)}
-          </p>
-          <ProgressBar currentWeek={clampedWeek} />
+          <ProgressBar value={progressPercent} label="Overall Progress" />
         </motion.div>
 
-        {/* ── Marcus Card ──────────────────────────────────── */}
+        {/* Streak */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
           animate="visible"
           custom={2}
-          className="mt-6"
+          className="mt-4 flex items-center gap-2"
         >
-          <MarcusCard quote={marcusMessage} />
+          <span className="text-2xl" role="img" aria-label="fire">
+            {'\uD83D\uDD25'}
+          </span>
+          <span className="font-body text-sm font-medium text-charcoal">
+            {streak} day streak
+          </span>
         </motion.div>
 
-        {/* ── Today's Practice ─────────────────────────────── */}
-        {todayContent && (
+        {/* Today's Meditation Card or Congrats */}
+        {isFinished ? (
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={3}
+            className="mt-6"
+          >
+            <Card highlighted>
+              <div className="text-center py-4">
+                <span className="text-5xl" role="img" aria-label="celebration">
+                  {'\uD83C\uDF1F'}
+                </span>
+                <h2 className="mt-4 font-display text-xl font-bold text-charcoal">
+                  Congratulations!
+                </h2>
+                <p className="mt-2 font-body text-sm text-warm-gray leading-relaxed">
+                  You have completed all 30 days of meditation. Your practice is now
+                  yours to continue. The stillness lives within you.
+                </p>
+              </div>
+            </Card>
+          </motion.div>
+        ) : todayContent ? (
           <motion.div
             variants={fadeUp}
             initial="hidden"
@@ -116,43 +141,42 @@ export default function DashboardPage() {
             className="mt-6"
           >
             <Card className="relative overflow-hidden">
-              {/* Subtle accent strip */}
               <div className="absolute inset-y-0 left-0 w-1 bg-accent" />
-
               <div className="pl-3">
                 <div className="flex items-center gap-2">
-                  <Badge variant={dayTypeToBadgeVariant(todayContent.type)} />
-                  {todayContent.estimatedMinutes > 0 && (
-                    <span className="font-mono text-xs text-text-dim">
-                      {todayContent.estimatedMinutes} min
-                    </span>
-                  )}
+                  <span
+                    className={[
+                      'rounded-full px-2.5 py-0.5 text-xs font-medium font-body capitalize',
+                      typeBadgeColors[todayContent.type] ?? 'bg-light-gray text-charcoal',
+                    ].join(' ')}
+                  >
+                    {todayContent.type.replace('-', ' ')}
+                  </span>
+                  <span className="font-mono text-xs text-warm-gray">
+                    {todayContent.durationMinutes} min
+                  </span>
                 </div>
 
                 <h2 className="mt-3 font-display text-xl font-bold text-charcoal">
                   {todayContent.title}
                 </h2>
-                {todayContent.subtitle && (
-                  <p className="mt-1 font-body text-sm text-warm-gray">
-                    {todayContent.subtitle}
-                  </p>
-                )}
+                <p className="mt-1 font-body text-sm text-warm-gray leading-relaxed">
+                  {todayContent.description}
+                </p>
 
                 <div className="mt-4">
                   <Link href={`/day/${currentDay}`}>
                     <Button fullWidth size="lg">
-                      {todayContent.isRestDay
-                        ? 'View today\u2019s rest day'
-                        : 'Start today\u2019s practice'}
+                      Begin Session
                     </Button>
                   </Link>
                 </div>
               </div>
             </Card>
           </motion.div>
-        )}
+        ) : null}
 
-        {/* ── This Week's Schedule ─────────────────────────── */}
+        {/* 30-day overview circles */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
@@ -161,73 +185,28 @@ export default function DashboardPage() {
           className="mt-8"
         >
           <h3 className="mb-3 font-body text-xs font-semibold tracking-widest text-warm-gray uppercase">
-            This week
+            30-day overview
           </h3>
-
-          <div className="space-y-2">
-            {weekDays.map((day) => {
-              const completion = getCompletionForDay(day.dayNumber);
-              const isToday = day.dayNumber === currentDay;
-              const isPast = day.dayNumber < currentDay;
-              const isCompleted = !!completion && !completion.skipped;
-              const isSkipped = !!completion?.skipped;
+          <div className="flex flex-wrap gap-2 justify-center">
+            {Array.from({ length: 30 }, (_, i) => {
+              const day = i + 1;
+              const isCompleted = !!completions[day];
+              const isCurrent = day === currentDay && !isFinished;
 
               return (
-                <Link
-                  key={day.dayNumber}
-                  href={`/day/${day.dayNumber}`}
+                <div
+                  key={day}
                   className={[
-                    'flex items-center gap-3 rounded-xl px-4 py-3 transition-colors duration-150',
-                    isToday
-                      ? 'bg-bg-surface border border-accent/30 shadow-sm'
-                      : 'hover:bg-bg-surface-2',
+                    'flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium font-body transition-colors',
+                    isCompleted
+                      ? 'bg-sage text-white'
+                      : isCurrent
+                      ? 'ring-2 ring-accent text-accent bg-primary'
+                      : 'bg-light-gray/50 text-warm-gray',
                   ].join(' ')}
                 >
-                  {/* Day indicator */}
-                  <div
-                    className={[
-                      'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-medium font-body',
-                      isCompleted
-                        ? 'bg-sage text-white'
-                        : isToday
-                        ? 'bg-accent text-white'
-                        : isSkipped
-                        ? 'bg-bg-surface-2 text-text-dim line-through'
-                        : 'bg-bg-surface-2 text-warm-gray',
-                    ].join(' ')}
-                  >
-                    {isCompleted ? '\u2713' : day.dayNumber}
-                  </div>
-
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={[
-                        'truncate font-body text-sm',
-                        isToday
-                          ? 'font-semibold text-charcoal'
-                          : isPast
-                          ? 'text-warm-gray'
-                          : 'text-charcoal',
-                      ].join(' ')}
-                    >
-                      {day.title}
-                    </p>
-                    <p className="text-xs text-text-dim">
-                      {getDayTypeIcon(day.type)}{' '}
-                      {getDayTypeLabel(day.type)}
-                      {day.estimatedMinutes > 0 &&
-                        ` \u00B7 ${day.estimatedMinutes} min`}
-                    </p>
-                  </div>
-
-                  {/* Status */}
-                  {isToday && !isCompleted && (
-                    <span className="flex-shrink-0 text-xs font-medium text-accent font-body">
-                      Today
-                    </span>
-                  )}
-                </Link>
+                  {isCompleted ? '\u2713' : day}
+                </div>
               );
             })}
           </div>

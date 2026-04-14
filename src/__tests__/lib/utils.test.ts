@@ -1,13 +1,10 @@
+import { vi, afterEach } from 'vitest';
 import {
   cn,
   getTimeOfDay,
-  getGreetingPrefix,
   formatDuration,
-  wordCount,
-  getPhaseForWeek,
-  getPhaseLabel,
-  getDayTypeIcon,
-  getDayTypeLabel,
+  getMeditationTypeIcon,
+  getMeditationTypeLabel,
 } from '@/lib/utils';
 
 describe('cn', () => {
@@ -31,76 +28,49 @@ describe('cn', () => {
     expect(cn('only')).toBe('only');
   });
 
-  it('should handle empty strings (they are falsy-like but truthy)', () => {
-    // Empty string is falsy, so it should be filtered out
+  it('should handle empty strings (they are falsy)', () => {
     expect(cn('a', '', 'b')).toBe('a b');
   });
 });
 
 describe('getTimeOfDay', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should return morning for hours before 12', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(8);
+    vi.spyOn(Date.prototype, 'getHours').mockReturnValue(8);
     expect(getTimeOfDay()).toBe('morning');
   });
 
   it('should return morning for hour 0 (midnight)', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(0);
+    vi.spyOn(Date.prototype, 'getHours').mockReturnValue(0);
     expect(getTimeOfDay()).toBe('morning');
   });
 
   it('should return morning for hour 11', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(11);
+    vi.spyOn(Date.prototype, 'getHours').mockReturnValue(11);
     expect(getTimeOfDay()).toBe('morning');
   });
 
   it('should return afternoon for hour 12', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(12);
+    vi.spyOn(Date.prototype, 'getHours').mockReturnValue(12);
     expect(getTimeOfDay()).toBe('afternoon');
   });
 
   it('should return afternoon for hour 16', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(16);
+    vi.spyOn(Date.prototype, 'getHours').mockReturnValue(16);
     expect(getTimeOfDay()).toBe('afternoon');
   });
 
   it('should return evening for hour 17', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(17);
+    vi.spyOn(Date.prototype, 'getHours').mockReturnValue(17);
     expect(getTimeOfDay()).toBe('evening');
   });
 
   it('should return evening for hour 23', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(23);
+    vi.spyOn(Date.prototype, 'getHours').mockReturnValue(23);
     expect(getTimeOfDay()).toBe('evening');
-  });
-});
-
-describe('getGreetingPrefix', () => {
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  it('should return morning greeting with name', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(9);
-    expect(getGreetingPrefix('Marcus')).toBe('Good morning, Marcus');
-  });
-
-  it('should return afternoon greeting with name', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(14);
-    expect(getGreetingPrefix('Sarah')).toBe('Good afternoon, Sarah');
-  });
-
-  it('should return evening greeting with name', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(20);
-    expect(getGreetingPrefix('Alex')).toBe('Good evening, Alex');
-  });
-
-  it('should handle empty name', () => {
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(9);
-    expect(getGreetingPrefix('')).toBe('Good morning, ');
   });
 });
 
@@ -134,124 +104,54 @@ describe('formatDuration', () => {
   });
 });
 
-describe('wordCount', () => {
-  it('should count words in a normal sentence', () => {
-    expect(wordCount('hello world')).toBe(2);
+describe('getMeditationTypeIcon', () => {
+  it('should return correct icon for guided', () => {
+    expect(getMeditationTypeIcon('guided')).toBe('\uD83E\uDDD8');
   });
 
-  it('should return 0 for empty string', () => {
-    expect(wordCount('')).toBe(0);
+  it('should return correct icon for breathing', () => {
+    expect(getMeditationTypeIcon('breathing')).toBe('\uD83C\uDF2C\uFE0F');
   });
 
-  it('should return 0 for whitespace-only string', () => {
-    expect(wordCount('   ')).toBe(0);
+  it('should return correct icon for body-scan', () => {
+    expect(getMeditationTypeIcon('body-scan')).toBe('\u2728');
   });
 
-  it('should handle multiple spaces between words', () => {
-    expect(wordCount('one   two   three')).toBe(3);
+  it('should return correct icon for silent', () => {
+    expect(getMeditationTypeIcon('silent')).toBe('\uD83E\uDD2B');
   });
 
-  it('should handle leading and trailing whitespace', () => {
-    expect(wordCount('  hello world  ')).toBe(2);
-  });
-
-  it('should handle tabs and newlines', () => {
-    expect(wordCount('hello\tworld\nnew line')).toBe(4);
-  });
-
-  it('should count a single word', () => {
-    expect(wordCount('hello')).toBe(1);
-  });
-});
-
-describe('getPhaseForWeek', () => {
-  it('should return excavation for week 1', () => {
-    expect(getPhaseForWeek(1)).toBe('excavation');
-  });
-
-  it('should return clarity for week 2', () => {
-    expect(getPhaseForWeek(2)).toBe('clarity');
-  });
-
-  it('should return vision for week 3', () => {
-    expect(getPhaseForWeek(3)).toBe('vision');
-  });
-
-  it('should return decision for week 4', () => {
-    expect(getPhaseForWeek(4)).toBe('decision');
-  });
-
-  it('should clamp to decision for weeks beyond 4', () => {
-    expect(getPhaseForWeek(5)).toBe('decision');
-    expect(getPhaseForWeek(10)).toBe('decision');
-  });
-});
-
-describe('getPhaseLabel', () => {
-  it('should capitalize the first letter', () => {
-    expect(getPhaseLabel('excavation')).toBe('Excavation');
-    expect(getPhaseLabel('clarity')).toBe('Clarity');
-    expect(getPhaseLabel('vision')).toBe('Vision');
-    expect(getPhaseLabel('decision')).toBe('Decision');
-  });
-
-  it('should handle single character', () => {
-    expect(getPhaseLabel('a')).toBe('A');
-  });
-
-  it('should handle empty string', () => {
-    expect(getPhaseLabel('')).toBe('');
-  });
-});
-
-describe('getDayTypeIcon', () => {
-  it('should return correct icon for journal', () => {
-    expect(getDayTypeIcon('journal')).toBe('\u270F\uFE0F');
-  });
-
-  it('should return correct icon for video_journal', () => {
-    expect(getDayTypeIcon('video_journal')).toBe('\uD83C\uDFAC');
-  });
-
-  it('should return correct icon for action', () => {
-    expect(getDayTypeIcon('action')).toBe('\u26A1');
-  });
-
-  it('should return correct icon for rest', () => {
-    expect(getDayTypeIcon('rest')).toBe('\uD83C\uDF3F');
-  });
-
-  it('should return correct icon for synthesis', () => {
-    expect(getDayTypeIcon('synthesis')).toBe('\uD83D\uDD2E');
+  it('should return correct icon for loving-kindness', () => {
+    expect(getMeditationTypeIcon('loving-kindness')).toBe('\uD83D\uDC97');
   });
 
   it('should return default icon for unknown type', () => {
-    expect(getDayTypeIcon('unknown')).toBe('\uD83D\uDCDD');
+    expect(getMeditationTypeIcon('unknown')).toBe('\uD83E\uDDD8');
   });
 });
 
-describe('getDayTypeLabel', () => {
-  it('should return correct label for journal', () => {
-    expect(getDayTypeLabel('journal')).toBe('Journal');
+describe('getMeditationTypeLabel', () => {
+  it('should return correct label for guided', () => {
+    expect(getMeditationTypeLabel('guided')).toBe('Guided');
   });
 
-  it('should return correct label for video_journal', () => {
-    expect(getDayTypeLabel('video_journal')).toBe('Video + Journal');
+  it('should return correct label for breathing', () => {
+    expect(getMeditationTypeLabel('breathing')).toBe('Breathing');
   });
 
-  it('should return correct label for action', () => {
-    expect(getDayTypeLabel('action')).toBe('Action');
+  it('should return correct label for body-scan', () => {
+    expect(getMeditationTypeLabel('body-scan')).toBe('Body Scan');
   });
 
-  it('should return correct label for rest', () => {
-    expect(getDayTypeLabel('rest')).toBe('Rest');
+  it('should return correct label for silent', () => {
+    expect(getMeditationTypeLabel('silent')).toBe('Silent');
   });
 
-  it('should return correct label for synthesis', () => {
-    expect(getDayTypeLabel('synthesis')).toBe('Synthesis');
+  it('should return correct label for loving-kindness', () => {
+    expect(getMeditationTypeLabel('loving-kindness')).toBe('Loving Kindness');
   });
 
   it('should return the type string itself for unknown types', () => {
-    expect(getDayTypeLabel('custom_type')).toBe('custom_type');
+    expect(getMeditationTypeLabel('custom_type')).toBe('custom_type');
   });
 });

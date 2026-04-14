@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,12 +13,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary:
-    'bg-accent text-white hover:bg-accent-dark active:bg-accent-dark shadow-sm',
+  primary: 'bg-accent text-white hover:bg-accent-dark active:bg-accent-dark shadow-sm',
   secondary:
-    'bg-bg-surface text-charcoal border border-border hover:bg-bg-surface-2 active:bg-bg-surface-2',
-  ghost:
-    'bg-transparent text-charcoal hover:bg-bg-surface-2 active:bg-bg-surface-2',
+    'bg-transparent text-charcoal border border-border hover:bg-bg-surface-2 active:bg-bg-surface-2',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
